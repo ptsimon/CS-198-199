@@ -1,0 +1,94 @@
+sudo /etc/init.d/freeradius start
+sudo /etc/init.d/freeradius restart
+sudo /etc/init.d/freeradius stop
+sudo freeradius -X
+
+radtest zaib zaib localhost 1812 testing123
+echo user-name=zaib, Framed-IP-Address=192.168.6.243 | radclient -x 192.168.88.1:3799 disconnect 12345
+echo User-Name := "mockinqjaye", Mikrotik-Rate-Limit = 512k/512k, Framed-IP-Address = 192.168.6.243 | radclient -x 192.168.88.1:3799 coa 12345
+
+
+~~~~~~
+
+IF WALA PANG DB
+
+ADD CLIENTS(mirkotik routers)
+sudo subl /etc/freeradius/clients.conf
+client <ip of access point> {
+	secret = secretpass
+	shortname = AP-NAME
+}
+
+ADD USERS (login management)
+sudo subl /etc/freeradius/users
+testuser Cleartext-Password := "testing123"
+
+
+~~~~~~~~~~~~~~~~~
+
+CONFIGURING FOR MIKROTIK
+ADD MIKROTIK DICTIONARY 
+cd /usr/share/freeradius && ls
+sudo subl /etc/freeradius/dictionary
+$INCLUDE	/usr/share/freeradius/dictionary.mikrotik
+
+sudo subl /usr/share/freeradius/dictionary.mikrotik
+ATTRIBUTE Mikrotik-Total-Limit 17 integer
+ATTRIBUTE Mikrotik-Total-Limit-Gigawords 18 integer
+
+Mikrotik-Recv-Limit and Mikrotik-Xmit-Limit for limiting how much data a user can use before being knocked offline (ie. once they transfer say 200MB they are kicked offline)
+
+~~~~~~~~~~~~~~~~
+enable mysql
+
+IMPORTING SCHEMA.SQL AND NAS.SQL
+sudo -i
+cd /etc/freeradius/sql/mysql/
+mysql -u root -ppurplepao26
+create database radius;
+grant all on radius.* to radius@localhost identified by "m@mOn123";
+use radius
+source schema.sql
+source nas.sql
+
+CREATE NEW USER IN MYSQL radius db
+User id = zaib
+Password = zaib
+Rate-Limit = 1024k/1024k
+
+INSERT INTO radcheck ( id , UserName , Attribute , op , Value ) VALUES ( NULL , 'zaib', 'user-password', '==', 'zaib');
+INSERT INTO radreply (usernmae, attribute, op, value) VALUES ('zaib', 'Mikrotik-Rate-Limit', '=', '1024k/1024k');
+
+READ CLIENTS FROM DATABASE
+sudo subl /etc/freeradius/sq.lconf
+(uncomment readclients = yes)
+server = "localhost"
+#port = 3306
+login = "radius"
+password = "m@mOn123"
+
+~~~~~~~~~~~~~~~~~
+CONFIGURE SHIT IN SQL.CONF
+
+sudo nano /etc/freeradius/sites-enabled/default
+uncomment "#	sql" in Accounting, Session, Post-Auth-Type
+	(lines 406, 454, 475)
+
+sudo subl /etc/freeradius/radiusd.conf
+(uncomment $INCLUDE sql.conf)
+
+sudo subl /etc/freeradius/sites-available/default
+uncomment "#	sql" after See “Authorization Queries” in sql.conf
+
+~~~~~~~~~~~~~~~~
+ADDING ‘NAS’ [Mikrotik] in CLIENTS.CONF
+ add the mikrotik IP and shared secret in clients.conf
+
+sudo subl clients.conf
+client 192.168.88.1 {
+	secret = xecretpaxx
+	shortname = Mikrotik
+}
+
+
+
